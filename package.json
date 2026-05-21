@@ -1,0 +1,25 @@
+{
+  "name": "chatgpt-thread-exporter",
+  "version": "0.1.0",
+  "description": "Chrome extension dedicated to exporting whole ChatGPT threads as Markdown.",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.js",
+    "build:crx": "crx3 -p -o -z -- dist/",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.23.0",
+    "@babel/preset-typescript": "^7.23.0",
+    "@types/chrome": "^0.0.304",
+    "@types/jest": "^29.5.0",
+    "crx3": "^2.0.0",
+    "fs-extra": "^8.1.0",
+    "jest": "^29.7.0",
+    "ts-loader": "^6.2.1",
+    "typescript": "^3.8.2",
+    "webpack": "^5.106.2"
+  }
+}

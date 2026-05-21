@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT Thread Exporter",
+  "version": "0.1.0",
+  "description": "Copy full ChatGPT threads as Markdown.",
+  "permissions": ["storage", "scripting", "activeTab", "clipboardWrite"],
+  "host_permissions": ["https://chatgpt.com/*"],
+  "background": {
+    "service_worker": "js/background_script.bundle.js"
+  },
+  "action": {
+    "default_title": "Export ChatGPT thread"
+  },
+  "options_page": "options.html",
+  "web_accessible_resources": [
+    {
+      "resources": ["js/content_script_export_chatgpt.bundle.js", "js/page_feedback.bundle.js", "js/runtime_snapshot_probe.bundle.js"],
+      "matches": ["https://chatgpt.com/*"]
+    }
+  ]
+}
