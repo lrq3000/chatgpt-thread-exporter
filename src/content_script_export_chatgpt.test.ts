@@ -1,6 +1,9 @@
 import {
   buildMarkdownFromPageHtml,
   buildMarkdownFromSources,
+  findConversationScrollContainer,
+  isLiveConversationPath,
+  injectFullThreadCollector,
   injectRuntimeSnapshotProbe,
 } from './content_script_export_chatgpt';
 import { extractConversationTurnsFromDocument } from './live_turn_extractor';
@@ -199,6 +202,128 @@ const createProbeDocument = (runtimeSnapshot: unknown) => {
   };
 };
 
+const buildOlderLiveConversationTurnsSnapshot = () => ({
+  conversationTurns: [
+    {
+      id: 'turn-older-user',
+      role: 'user',
+      messages: [
+        {
+          id: 'message-older-user',
+          author: { role: 'user' },
+          content: { content_type: 'text', parts: ['Older user question'] },
+        },
+      ],
+    },
+    ...buildLiveConversationTurnsSnapshot().conversationTurns,
+  ],
+});
+
+const createCollectorDocument = (runtimeSnapshot: unknown, initialScrollTop: number) => {
+  const appendedNodes: any[] = [];
+  const scrollContainer = { scrollTop: initialScrollTop };
+  const root = {
+    appendChild(node: any) {
+      node.parentNode = root;
+      appendedNodes.push(node);
+      if (node.src === 'chrome-extension://fixture/js/runtime_full_thread_collector.bundle.js') {
+        scrollContainer.scrollTop = 0;
+        const resultNode = appendedNodes.find((candidate) => candidate.id === 'chatgpt-thread-exporter-runtime-snapshot');
+        if (resultNode) {
+          resultNode.textContent = JSON.stringify(runtimeSnapshot);
+        }
+        if (typeof node.onload === 'function') {
+          node.onload();
+        }
+      }
+      return node;
+    },
+    removeChild(node: any) {
+      const index = appendedNodes.indexOf(node);
+      if (index >= 0) appendedNodes.splice(index, 1);
+      node.parentNode = null;
+      return node;
+    },
+  };
+
+  return {
+    appendedNodes,
+    scrollContainer,
+    document: {
+      documentElement: root,
+      getElementById: (id: string) => appendedNodes.find((node) => node.id === id) || null,
+      createElement: (_tagName: string) => ({
+        id: '',
+        type: '',
+        textContent: '',
+        src: '',
+        parentNode: null,
+        onload: undefined,
+        onerror: undefined,
+      }),
+    } as unknown as Document,
+  };
+};
+
+const createScrollContainerDocument = () => {
+  const outerWrapper = {
+    tagName: 'DIV',
+    className: 'outer-wrapper',
+    clientHeight: 765,
+    scrollHeight: 765,
+    scrollTop: 0,
+    parentElement: null as any,
+  };
+  const scrollableAncestor = {
+    tagName: 'DIV',
+    className: 'actual-scroll-container',
+    clientHeight: 765,
+    scrollHeight: 13935,
+    scrollTop: 13170,
+    parentElement: outerWrapper,
+  };
+  const visibleOverflowAncestor = {
+    tagName: 'DIV',
+    className: 'wrong-visible-ancestor',
+    clientHeight: 13795,
+    scrollHeight: 13827,
+    scrollTop: 0,
+    parentElement: scrollableAncestor,
+  };
+  const firstTurn = {
+    tagName: 'SECTION',
+    className: 'turn',
+    clientHeight: 0,
+    scrollHeight: 0,
+    scrollTop: 0,
+    parentElement: visibleOverflowAncestor,
+  };
+  const doc = {
+    querySelector: (selector: string) => selector === '[data-testid^="conversation-turn-"]' ? firstTurn : null,
+    scrollingElement: {
+      tagName: 'HTML',
+      className: 'html-root',
+      clientHeight: 765,
+      scrollHeight: 765,
+      scrollTop: 0,
+    },
+    documentElement: {
+      tagName: 'HTML',
+      className: 'html-root',
+      clientHeight: 765,
+      scrollHeight: 765,
+      scrollTop: 0,
+    },
+    defaultView: {
+      getComputedStyle: (element: any) => ({
+        overflowY: element === scrollableAncestor ? 'auto' : 'visible',
+      }),
+    },
+  };
+
+  return { document: doc as unknown as Document, scrollableAncestor, visibleOverflowAncestor };
+};
+
 describe('ChatGPT export content script helper', () => {
   it('builds markdown from page html using stored export options', () => {
     const markdown = buildMarkdownFromPageHtml(buildSerializedHtml(), {
@@ -296,5 +421,35 @@ describe('ChatGPT export content script helper', () => {
 
     expect(extracted).toEqual(runtimeSnapshot);
     expect(probe.appendedNodes).toHaveLength(0);
+  });
+
+  it('identifies live conversation paths without matching shared threads', () => {
+    expect(isLiveConversationPath('https://chatgpt.com/c/123')).toBe(true);
+    expect(isLiveConversationPath('https://chatgpt.com/share/123')).toBe(false);
+    expect(isLiveConversationPath('https://chatgpt.com/')).toBe(false);
+  });
+
+  it('injects a full-thread collector for live threads and restores scroll position', async () => {
+    const runtimeSnapshot = buildOlderLiveConversationTurnsSnapshot();
+    const collector = createCollectorDocument(runtimeSnapshot, 640);
+
+    const extracted = await injectFullThreadCollector(
+      collector.document,
+      collector.scrollContainer,
+      'chrome-extension://fixture/js/runtime_full_thread_collector.bundle.js'
+    );
+
+    expect(extracted).toEqual(runtimeSnapshot);
+    expect(collector.scrollContainer.scrollTop).toBe(640);
+    expect(collector.appendedNodes).toHaveLength(0);
+  });
+
+  it('prefers the actual overflow scroll container over larger visible ancestors', () => {
+    const fixture = createScrollContainerDocument();
+
+    const container = findConversationScrollContainer(fixture.document);
+
+    expect(container).toBe(fixture.scrollableAncestor);
+    expect(container).not.toBe(fixture.visibleOverflowAncestor);
   });
 });

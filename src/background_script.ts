@@ -48,7 +48,7 @@ chrome.action.onClicked.addListener(async (tab) => {
       const timeout = setTimeout(() => {
         pendingRequests.delete(tab.id as number);
         reject(new Error('ChatGPT export timed out.'));
-      }, 5000);
+      }, 30000);
 
       pendingRequests.set(tab.id as number, { resolve, reject, timeout });
     });

@@ -14,7 +14,7 @@
   "options_page": "options.html",
   "web_accessible_resources": [
     {
-      "resources": ["js/content_script_export_chatgpt.bundle.js", "js/page_feedback.bundle.js", "js/runtime_snapshot_probe.bundle.js"],
+      "resources": ["js/content_script_export_chatgpt.bundle.js", "js/page_feedback.bundle.js", "js/runtime_snapshot_probe.bundle.js", "js/runtime_full_thread_collector.bundle.js"],
       "matches": ["https://chatgpt.com/*"]
     }
   ]
