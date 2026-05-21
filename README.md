@@ -22,9 +22,10 @@ You can also package it as a CRX or zip for local distribution. See the CRX subs
 ## Usage
 
 1. Open a ChatGPT thread on `https://chatgpt.com/`.
-2. Click the **ChatGPT Thread Exporter** toolbar icon.
-3. The extension extracts the whole thread and copies the resulting Markdown to the clipboard.
-4. A toast appears in the page to confirm success or to show an error.
+2. Either scroll all the way up to force load all messages, or create a shareable link and open it (all messages are loaded at once in a shareable link).
+3. Click the **ChatGPT Thread Exporter** toolbar icon.
+4. The extension extracts the whole thread and copies the resulting Markdown to the clipboard.
+5. A toast appears in the page to confirm success or to show an error.
 
 ### What gets exported by default
 
