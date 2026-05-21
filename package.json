@@ -1,13 +1,28 @@
 {
   "name": "chatgpt-thread-exporter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Chrome extension dedicated to exporting whole ChatGPT threads as Markdown.",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lrq3000/chatgpt-thread-exporter.git"
+  },
   "scripts": {
     "build": "node scripts/build.js",
     "build:crx": "crx3 -p -o -z -- dist/",
     "test": "jest --runInBand"
   },
+  "keywords": [
+    "Chrome",
+    "Extension",
+    "HTML",
+    "Markdown"
+  ],
+  "author": "Stephen Karl Larroque lrq3000",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lrq3000/chatgpt-thread-exporter/issues"
+  },
+  "homepage": "https://github.com/lrq3000/chatgpt-thread-exporter",
   "dependencies": {},
   "devDependencies": {
     "@babel/core": "^7.23.0",
