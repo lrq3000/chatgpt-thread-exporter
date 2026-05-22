@@ -2,30 +2,55 @@ import { ConversationTurn } from './chatgpt_parser';
 
 type RuntimeDocumentLike = Pick<Document, 'querySelectorAll'>;
 
-const extractTurnFromReactNode = (value: unknown): ConversationTurn | undefined => {
-  if (!value || typeof value !== 'object') return undefined;
+const preferredNestedKeys = [
+  'pendingProps',
+  'memoizedProps',
+  'props',
+  'children',
+  'child',
+  'sibling',
+  'return',
+  'memoizedState',
+  'ref',
+  'current',
+] as const;
 
-  const candidates = [
-    value,
-    (value as { pendingProps?: unknown }).pendingProps,
-    (value as { memoizedProps?: unknown }).memoizedProps,
-    (value as { props?: unknown }).props,
-  ];
+const isConversationTurn = (value: unknown): value is ConversationTurn => {
+  return !!value
+    && typeof value === 'object'
+    && Array.isArray((value as ConversationTurn).messages)
+    && typeof (value as ConversationTurn).role === 'string';
+};
 
-  for (const candidate of candidates) {
-    if (!candidate || typeof candidate !== 'object') continue;
+const extractTurnFromReactNode = (
+  value: unknown,
+  depth: number = 0,
+  seen: Set<unknown> = new Set()
+): ConversationTurn | undefined => {
+  if (!value || typeof value !== 'object' || depth > 12 || seen.has(value)) return undefined;
+  seen.add(value);
 
-    const candidateTurn = (candidate as { turn?: ConversationTurn }).turn;
-    if (candidateTurn && Array.isArray(candidateTurn.messages) && typeof candidateTurn.role === 'string') {
-      return candidateTurn;
-    }
+  const directTurn = (value as { turn?: unknown }).turn;
+  if (isConversationTurn(directTurn)) {
+    return directTurn;
+  }
 
-    const children = (candidate as { children?: unknown }).children;
-    const childValues = Array.isArray(children) ? children : typeof children === 'undefined' ? [] : [children];
-    for (const child of childValues) {
-      const childTurn = extractTurnFromReactNode(child);
-      if (childTurn) return childTurn;
-    }
+  // ChatGPT stores turn data on a few stable React fields first, but newer builds
+  // also tuck older turns behind `fiber.return.pendingProps.turn`. We walk those
+  // hotspots before falling back to a bounded object scan.
+  for (const key of preferredNestedKeys) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+
+    const nestedValue = (value as Record<string, unknown>)[key];
+    const nestedTurn = extractTurnFromReactNode(nestedValue, depth + 1, seen);
+    if (nestedTurn) return nestedTurn;
+  }
+
+  for (const nestedValue of Object.values(value as Record<string, unknown>)) {
+    if (!nestedValue || typeof nestedValue !== 'object') continue;
+
+    const nestedTurn = extractTurnFromReactNode(nestedValue, depth + 1, seen);
+    if (nestedTurn) return nestedTurn;
   }
 
   return undefined;
