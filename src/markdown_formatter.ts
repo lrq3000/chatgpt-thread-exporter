@@ -58,8 +58,18 @@ export const formatConversationMarkdown = (nodes: ExportNode[]): string => {
   let assistantCount = 0;
   let currentAssistantState: AssistantCitationState | undefined;
 
+  const flushCurrentAssistantSources = (): void => {
+    // Citation numbering is scoped to one assistant response. When we leave the
+    // current assistant block (for a user turn, a new assistant turn, or EOF),
+    // we must persist the gathered bibliography before resetting that scope.
+    if (currentAssistantIndex >= 0 && currentAssistantState && currentAssistantState.bibliography.length > 0) {
+      sections[currentAssistantIndex] += '\n\n#### Sources\n\n' + currentAssistantState.bibliography.join('\n');
+    }
+  };
+
   for (const node of nodes) {
     if (node.kind === 'user') {
+      flushCurrentAssistantSources();
       sections.push('## User\n\n' + node.content);
       currentAssistantIndex = -1;
       currentAssistantState = undefined;
@@ -67,9 +77,7 @@ export const formatConversationMarkdown = (nodes: ExportNode[]): string => {
     }
 
     if (node.kind === 'assistant') {
-      if (currentAssistantIndex >= 0 && currentAssistantState && currentAssistantState.bibliography.length > 0) {
-        sections[currentAssistantIndex] += '\n\n#### Sources\n\n' + currentAssistantState.bibliography.join('\n');
-      }
+      flushCurrentAssistantSources();
 
       assistantCount += 1;
       currentAssistantState = createAssistantCitationState();
@@ -94,9 +102,7 @@ export const formatConversationMarkdown = (nodes: ExportNode[]): string => {
     }
   }
 
-  if (currentAssistantIndex >= 0 && currentAssistantState && currentAssistantState.bibliography.length > 0) {
-    sections[currentAssistantIndex] += '\n\n#### Sources\n\n' + currentAssistantState.bibliography.join('\n');
-  }
+  flushCurrentAssistantSources();
 
   return sections.join('\n\n');
 };

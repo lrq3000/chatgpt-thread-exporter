@@ -95,4 +95,31 @@ describe('markdown formatter citations', () => {
     expect(markdown.match(/#### Sources/g)).toHaveLength(1);
     expect(markdown.indexOf('Tool used [1.1] and [1.2].')).toBeLessThan(markdown.indexOf('#### Sources'));
   });
+
+  it('flushes sources before the next user turn', () => {
+    const markdown = formatConversationMarkdown([
+      {
+        kind: 'assistant',
+        title: 'Assistant',
+        content: 'Answer @@CITATION_GROUP_0@@.',
+        citations: [
+          {
+            placeholder: '@@CITATION_GROUP_0@@',
+            sources: [
+              { key: 'A|https://example.com/a||', name: 'Source A', url: 'https://example.com/a' },
+            ],
+          },
+        ],
+      },
+      {
+        kind: 'user',
+        title: 'User',
+        content: 'Follow-up question',
+      },
+    ] as any);
+
+    expect(markdown).toContain('Answer [1.1].');
+    expect(markdown).toContain('#### Sources\n\n1.1. [Source A](https://example.com/a)');
+    expect(markdown.indexOf('#### Sources')).toBeLessThan(markdown.indexOf('## User\n\nFollow-up question'));
+  });
 });
