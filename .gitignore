@@ -1,3 +1,6 @@
 node_modules
 dist
 .worktrees/
+dist.pem
+dist.crx
+dist.zip
