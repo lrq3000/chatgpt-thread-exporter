@@ -6,6 +6,17 @@ type PendingRequest = {
 
 const pendingRequests = new Map<number, PendingRequest>();
 
+export const isSupportedChatGptTabUrl = (url?: string): boolean => {
+  if (!url) return false;
+
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.protocol === 'https:' && parsedUrl.hostname === 'chatgpt.com';
+  } catch (_error) {
+    return false;
+  }
+};
+
 chrome.runtime.onMessage.addListener(async (request, sender) => {
   if (!sender.tab || typeof sender.tab.id !== 'number') return;
 
@@ -42,6 +53,12 @@ chrome.runtime.onMessage.addListener(async (request, sender) => {
 
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab || typeof tab.id !== 'number') return;
+
+  if (!isSupportedChatGptTabUrl(tab.url)) {
+    // activeTab is intentionally temporary; reject unsupported pages before injecting any scripts.
+    console.error('ChatGPT Thread Exporter can only run on https://chatgpt.com/ pages.');
+    return;
+  }
 
   try {
     const completion = new Promise<void>((resolve, reject) => {

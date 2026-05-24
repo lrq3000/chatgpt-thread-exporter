@@ -4,7 +4,6 @@
   "version": "0.1.3",
   "description": "Copy full ChatGPT threads as Markdown.",
   "permissions": ["storage", "scripting", "activeTab", "clipboardWrite"],
-  "host_permissions": ["https://chatgpt.com/*"],
   "background": {
     "service_worker": "js/background_script.bundle.js"
   },
