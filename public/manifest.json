@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Thread Exporter",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Copy full ChatGPT threads as Markdown.",
   "homepage_url": "https://github.com/lrq3000/chatgpt-thread-exporter",
   "icons": {
