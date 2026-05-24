@@ -131,6 +131,15 @@ If you do not provide a key, `crx3` can generate one for local packaging, but th
 - Live logged-in ChatGPT pages are supported through runtime snapshot extraction paths.
 - If ChatGPT changes its internal client data structures substantially, this extension may need to be updated.
 
+## Known limitations
+
+- Images are not exported.
+
+## Similar tools
+
+As of 24th May 2026, here are similar export tools that still work:
+* [ChatGPT-Backup](https://github.com/FredySandoval/ChatGPT-CHROME_EXTENSION)
+
 ## Author
 
 Stephen Karl Larroque with agentic coding (see commits for exact harness and model version).
