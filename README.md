@@ -1,10 +1,12 @@
 # ChatGPT Thread Exporter
 
+**Instant export of full ChatGPT threads as markdown, with sources and thinking traces.**
+
 A Chrome extension that copies the whole content of a ChatGPT thread as Markdown without relying on text selection.
 
-It is designed specifically for ChatGPT pages as they are dynamically mounted and hence cannot be copied with CTRL+A. Unlike generic selection-based exporters, this extension reads ChatGPT's conversation data model directly.çç
+It is designed specifically for ChatGPT pages as they are dynamically mounted since May 2026 and hence cannot be copied with CTRL+A. Unlike generic selection-based exporters, this extension reads ChatGPT's conversation data model directly.çç
 
-It includes user messages, assistant messages, sources (numbered and recapped at the end of each turn -- multiple sources for a single sentence are all extracted correctly), and optionally: tool or connector outputs, and reasoning or recap nodes.
+It includes user messages, assistant messages, sources and links (numbered and recapped at the end of each turn -- multiple sources for a single sentence are all extracted correctly), and optionally: tool or connector outputs, and reasoning or recap nodes.
 
 To copy just a selection as markdown on any web page, see [copy-as-markdown](https://github.com/lrq3000/copy-as-markdown).
 
