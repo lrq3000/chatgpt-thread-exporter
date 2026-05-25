@@ -136,6 +136,7 @@ If you do not provide a key, `crx3` can generate one for local packaging, but th
 ## Known limitations
 
 - Images are not exported.
+- Attached documents are not exported either (not only those that are only linked but also text/markdown documents that are displayed inline -- always double check your exports, or instruct the agent to always inline all responses and never make an attached document, or ask the agent to inline the files content before export).
 
 ## Similar tools
 
