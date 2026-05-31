@@ -14,9 +14,11 @@ To copy just a selection as markdown on any web page, see [copy-as-markdown](htt
 
 ## Install
 
-There is no Chrome Web Store release yet.
+## Install
 
-For now, install it as an unpacked extension:
+* [Chrome WebStore](https://chromewebstore.google.com/detail/chatgpt-thread-exporter/jacjjihjaeoligdoojcooomoafbmlbhn)
+
+* Or download the latest developer release in the [GitHub Releases](https://github.com/lrq3000/chatgpt-thread-exporter/releases/) page, download the zip file, unzip it somewhere, and install as an unpacked extension:
 
 1. Clone or download this repository.
 2. Build the extension with the instructions in the Build section below.
@@ -25,7 +27,7 @@ For now, install it as an unpacked extension:
 5. Click **Load unpacked**.
 6. Select the `ChatGPT Thread Exporter/dist/` folder.
 
-You can also package it as a CRX or zip for local distribution. See the CRX subsection in Build.
+You can also package it as a CRX or zip for local distribution. See the CRX subsection in Build. However, note that even signed CRX files that are not hosted on the Chrome WebStore are now disabled forcefully since Chrome forcefully migrated to MV3 in 2025.
 
 ## Usage
 
