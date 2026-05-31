@@ -1,5 +1,8 @@
 # ChatGPT Thread Exporter
 
+[![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-4285F4?logo=chromewebstore&logoColor=white)](#)
+[![ChatGPT](https://custom-icon-badges.demolab.com/badge/ChatGPT-74aa9c?logo=openai&logoColor=white)](#)
+
 **Instant export of full ChatGPT threads as markdown, with sources and thinking traces.**
 
 A Chrome extension that copies the whole content of a ChatGPT thread as Markdown without relying on text selection.
