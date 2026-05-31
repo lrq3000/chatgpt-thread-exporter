@@ -1,6 +1,6 @@
 # ChatGPT Thread Exporter
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-4285F4?logo=chromewebstore&logoColor=white)](#)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-4285F4?logo=chromewebstore&logoColor=white)](https://chromewebstore.google.com/detail/chatgpt-thread-exporter/jacjjihjaeoligdoojcooomoafbmlbhn)
 [![ChatGPT](https://custom-icon-badges.demolab.com/badge/ChatGPT-74aa9c?logo=openai&logoColor=white)](#)
 
 **Instant export of full ChatGPT threads as markdown, with sources and thinking traces.**
