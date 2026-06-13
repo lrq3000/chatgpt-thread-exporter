@@ -425,6 +425,7 @@ describe('ChatGPT export content script helper', () => {
 
   it('identifies live conversation paths without matching shared threads', () => {
     expect(isLiveConversationPath('https://chatgpt.com/c/123')).toBe(true);
+    expect(isLiveConversationPath('https://chatgpt.com/g/g-685202a600908191ab3bb5748df5f0b7-omniexpert-developer/c/69fbbd98-5398-83eb-819e-39483cb8425b')).toBe(true);
     expect(isLiveConversationPath('https://chatgpt.com/share/123')).toBe(false);
     expect(isLiveConversationPath('https://chatgpt.com/')).toBe(false);
   });

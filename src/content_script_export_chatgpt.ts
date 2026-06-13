@@ -58,7 +58,9 @@ const runtimeSnapshotProbeId = 'chatgpt-thread-exporter-runtime-snapshot';
 
 export const isLiveConversationPath = (url: string): boolean => {
   try {
-    return new URL(url).pathname.indexOf('/c/') === 0;
+    const pathname = new URL(url).pathname;
+    // Normal chats live at /c/<id>; custom GPT chats live at /g/<gpt-slug>/c/<id>.
+    return /^\/c\/[^/]+/.test(pathname) || /^\/g\/[^/]+\/c\/[^/]+/.test(pathname);
   } catch (_error) {
     return false;
   }
