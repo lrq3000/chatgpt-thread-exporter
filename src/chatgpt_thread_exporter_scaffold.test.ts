@@ -15,6 +15,16 @@ describe('ChatGPT Thread Exporter scaffold', () => {
     expect(manifest).not.toHaveProperty('host_permissions');
   });
 
+  it('does not request clipboard readback or offscreen document permissions', () => {
+    const manifestPath = path.join(__dirname, '..', 'public', 'manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+    // Chrome Web Store users see permission prompts as a privacy contract. This
+    // extension only needs to write the export chosen from the active tab; it
+    // must not ask for APIs that can inspect clipboard contents or hidden pages.
+    expect(manifest.permissions).not.toEqual(expect.arrayContaining(['clipboardRead', 'offscreen']));
+  });
+
   it('keeps web accessible resources scoped to ChatGPT pages', () => {
     const manifestPath = path.join(__dirname, '..', 'public', 'manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));

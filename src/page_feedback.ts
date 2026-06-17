@@ -60,8 +60,14 @@ const fallbackCopyToClipboard = (content: string): void => {
 
 const copyMarkdownToClipboard = async (content: string): Promise<void> => {
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    await navigator.clipboard.writeText(content);
-    return;
+    try {
+      await navigator.clipboard.writeText(content);
+      return;
+    } catch (_error) {
+      // Long live-thread collection can outlive Chromium's transient user activation.
+      // In that case the extension clipboard permission can still allow the legacy
+      // focused-textarea copy path, so try it before reporting failure.
+    }
   }
 
   fallbackCopyToClipboard(content);
@@ -70,11 +76,26 @@ const copyMarkdownToClipboard = async (content: string): Promise<void> => {
 export const installPageFeedbackListener = (runtime: typeof chrome.runtime): void => {
   if (isPageFeedbackListenerInstalled) return;
 
-  runtime.onMessage.addListener((request) => {
+  runtime.onMessage.addListener((request, _sender, sendResponse) => {
     if (request && typeof request.markdownText === 'string') {
       void copyMarkdownToClipboard(request.markdownText)
-        .then(() => showToast('ChatGPT thread copied as Markdown', '#16a34a'))
-        .catch((error) => showToast(error instanceof Error ? error.message : 'Clipboard copy failed', '#dc2626'));
+        .then(() => {
+          if (request.silent !== true) {
+            showToast('ChatGPT thread copied as Markdown', '#16a34a');
+          }
+          sendResponse({ ok: true });
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : 'Clipboard copy failed';
+          showToast(message, '#dc2626');
+          sendResponse({ ok: false, error: message });
+        });
+      // Keep the message channel open until the asynchronous clipboard write finishes.
+      return true;
+    }
+
+    if (request && typeof request.successText === 'string') {
+      showToast(request.successText, '#16a34a');
     }
 
     if (request && typeof request.errorText === 'string') {
