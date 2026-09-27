@@ -9,6 +9,15 @@ import {
   SharedConversationData,
 } from './chatgpt_parser';
 import { extractConversationTurnsFromDocument } from './live_turn_extractor';
+import {
+  extractConversationIdFromPath,
+  extractShareIdFromPath,
+  fetchConversationViaApi,
+  fetchSharedConversationViaApi,
+  isConversationPath,
+  isSharePath,
+} from './conversation_api';
+import { extractExportNodesFromNewDocument } from './new_dom_turn_extractor';
 import { findConversationScrollContainer } from './scroll_container';
 import { formatConversationMarkdown } from './markdown_formatter';
 import { loadExportOptions } from './storage';
@@ -56,15 +65,10 @@ const getExportNodesFromSources = ({ html, runtimeSnapshot, options }: MarkdownS
 
 const runtimeSnapshotProbeId = 'chatgpt-thread-exporter-runtime-snapshot';
 
-export const isLiveConversationPath = (url: string): boolean => {
-  try {
-    const pathname = new URL(url).pathname;
-    // Normal chats live at /c/<id>; custom GPT chats live at /g/<gpt-slug>/c/<id>.
-    return /^\/c\/[^/]+/.test(pathname) || /^\/g\/[^/]+\/c\/[^/]+/.test(pathname);
-  } catch (_error) {
-    return false;
-  }
-};
+// The old UI matched any /c/<id> path regardless of host; the new-shell API
+// path also requires a chatgpt.com origin so the fetch helpers only run on
+// pages they can actually serve.
+export const isLiveConversationPath = (url: string): boolean => isConversationPath(url);
 
 const waitForResultNodeText = async (documentLike: RuntimeDocumentLike, timeoutMs: number): Promise<string | undefined> => {
   const startTime = Date.now();
@@ -176,23 +180,92 @@ export const buildMarkdownFromPageHtml = (html: string, options: ExportOptions):
   return buildMarkdownFromSources({ html, options });
 };
 
+// The new app shell ("Work mode" UI) renders no legacy turn markers and no
+// embedded conversation data on hard load, so extraction goes through the
+// page's own backend API first, then falls back to DOM markers and finally to
+// the legacy runtime collectors used by the old UI and old share pages.
+const fetchExportNodesFromNewShell = async (
+  pathname: string,
+  options: ExportOptions
+): Promise<ExportNode[]> => {
+  const shareId = extractShareIdFromPath(pathname);
+  if (shareId) {
+    const shareResult = await fetchSharedConversationViaApi({ shareId });
+    if (shareResult.ok) {
+      return parseSharedConversationData(shareResult.data, options);
+    }
+    throw new Error(shareResult.error);
+  }
+
+  const conversationId = extractConversationIdFromPath(pathname);
+  if (conversationId) {
+    const conversationResult = await fetchConversationViaApi({ conversationId });
+    if (conversationResult.ok) {
+      return parseSharedConversationData(conversationResult.data, options);
+    }
+    throw new Error(conversationResult.error);
+  }
+
+  throw new Error('This page does not reference a ChatGPT conversation.');
+};
+
 const runThreadExport = async (): Promise<void> => {
   try {
     const options = await loadExportOptions(chrome.storage.sync);
+    const pathname = window.location.pathname;
     const html = document.documentElement ? document.documentElement.outerHTML : document.body.innerHTML;
-    const runtimeSnapshot = isLiveConversationPath(window.location.href)
-      ? await injectFullThreadCollector(
-        document,
-        getScrollContainer(),
-        chrome.runtime.getURL('js/runtime_full_thread_collector.bundle.js')
-      )
-      : (() => {
-        const pageWorldTurns = extractConversationTurnsFromDocument(document);
-        return pageWorldTurns.length > 0
-          ? { conversationTurns: pageWorldTurns }
-          : undefined;
-      })() || await injectRuntimeSnapshotProbe(document, chrome.runtime.getURL('js/runtime_snapshot_probe.bundle.js'));
-    const markdownText = buildMarkdownFromSources({ html, runtimeSnapshot, options });
+
+    let exportNodes: ExportNode[];
+
+    if (isSharePath(window.location.href) || isLiveConversationPath(window.location.href)) {
+      // Primary path: the page's own conversation API (works for the new Work
+      // mode shell and for regular chat threads alike, on any layout).
+      try {
+        exportNodes = await fetchExportNodesFromNewShell(pathname, options);
+      } catch (_apiError) {
+        // Fallback 1: read the new-shell DOM turn markers directly. No citation
+        // metadata is available this way, but the thread content still exports.
+        const newDomNodes = extractExportNodesFromNewDocument(document, options);
+        if (newDomNodes.length === 0) {
+          // Fallback 2: legacy extraction paths (old UI DOM fibers, embedded
+          // share payloads, runtime probes).
+          exportNodes = getExportNodesFromSources({
+            html,
+            runtimeSnapshot: isLiveConversationPath(window.location.href)
+              ? await injectFullThreadCollector(
+                document,
+                getScrollContainer(),
+                chrome.runtime.getURL('js/runtime_full_thread_collector.bundle.js')
+              )
+              : (() => {
+                const pageWorldTurns = extractConversationTurnsFromDocument(document);
+                return pageWorldTurns.length > 0
+                  ? { conversationTurns: pageWorldTurns }
+                  : undefined;
+              })() || await injectRuntimeSnapshotProbe(document, chrome.runtime.getURL('js/runtime_snapshot_probe.bundle.js')),
+            options,
+          });
+        } else {
+          exportNodes = newDomNodes;
+        }
+      }
+    } else {
+      exportNodes = getExportNodesFromSources({
+        html,
+        runtimeSnapshot: (() => {
+          const pageWorldTurns = extractConversationTurnsFromDocument(document);
+          return pageWorldTurns.length > 0
+            ? { conversationTurns: pageWorldTurns }
+            : undefined;
+        })() || await injectRuntimeSnapshotProbe(document, chrome.runtime.getURL('js/runtime_snapshot_probe.bundle.js')),
+        options,
+      });
+    }
+
+    const markdownText = formatConversationMarkdown(exportNodes).trim();
+    if (!markdownText) {
+      throw new Error('The current ChatGPT thread did not produce any exportable Markdown.');
+    }
     await chrome.runtime.sendMessage({ markdownText });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown ChatGPT export error.';
