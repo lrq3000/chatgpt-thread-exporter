@@ -11,6 +11,8 @@ It is designed specifically for ChatGPT pages as they are dynamically mounted si
 
 It includes user messages, assistant messages, sources and links (numbered and recapped at the end of each turn -- multiple sources for a single sentence are all extracted correctly), and optionally: tool or connector outputs, and reasoning or recap nodes.
 
+Tools/Connectors output export is especially useful when exporting the complete bibliographic results of external search tools such as Consensus (and this extension is the only extensions that can export the full outputs of these connectors).
+
 Both private and shared threads can be exported, in both **Chat mode** and the new **Work mode** UI.
 
 To copy just a selection as markdown on any web page, see [copy-as-markdown](https://github.com/lrq3000/copy-as-markdown).
@@ -177,7 +179,7 @@ If you do not provide a key, `crx3` can generate one for local packaging, but th
 ## Similar tools
 
 As of 24th May 2026, here are similar export tools that still work:
-* [ChatGPT-Backup](https://github.com/FredySandoval/ChatGPT-CHROME_EXTENSION)
+* [ChatGPT-Backup](https://github.com/FredySandoval/ChatGPT-CHROME_EXTENSION) (nice outputs including attached files and inline citations as of September 2026 and can export whole projects, but partial export of attached files as some are missing, and tools/connectors outputs are not exported).
 
 ## Author
 
