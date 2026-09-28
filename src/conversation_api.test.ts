@@ -1,4 +1,4 @@
-import { isConversationPath, fetchConversationViaApi } from './conversation_api';
+import { isConversationPath, fetchConversationViaApi, extractConversationIdFromPath, extractShareIdFromPath, isClientSideConversationId } from './conversation_api';
 
 type FetchResponseLike = { ok: boolean; status: number; json: () => Promise<any> };
 
@@ -32,6 +32,44 @@ describe('isConversationPath', () => {
     expect(isConversationPath('https://chatgpt.com/share/6ab9a2cc-87f8-83eb-ae3f-8ea9d709e259')).toBe(false);
     expect(isConversationPath('https://chatgpt.com/')).toBe(false);
     expect(isConversationPath('https://example.com/c/abc')).toBe(false);
+  });
+
+  it('extracts conversation ids from encoded and plain pathnames', () => {
+    // location.pathname keeps percent-encoding; the id must come out decoded.
+    expect(extractConversationIdFromPath('/c/6ab882f1-bae8-83eb-905c-54e5bb6b18e3')).toBe('6ab882f1-bae8-83eb-905c-54e5bb6b18e3');
+    expect(extractConversationIdFromPath('/g/g-p-1234/c/6ab882f1-bae8-83eb-905c-54e5bb6b18e3')).toBe('6ab882f1-bae8-83eb-905c-54e5bb6b18e3');
+    expect(extractConversationIdFromPath('/g/g-p-1234/c/local-chatgpt%3A5ff271d7-ed2e-4122-952d-bc3771d498a4')).toBe('local-chatgpt:5ff271d7-ed2e-4122-952d-bc3771d498a4');
+    expect(extractConversationIdFromPath('/c/local-chatgpt:5ff271d7-ed2e-4122-952d-bc3771d498a4')).toBe('local-chatgpt:5ff271d7-ed2e-4122-952d-bc3771d498a4');
+    expect(extractConversationIdFromPath('/')).toBeUndefined();
+  });
+
+  it('extracts share ids from encoded pathnames', () => {
+    expect(extractShareIdFromPath('/share/6ab9a2cc-87f8-83eb-ae3f-8ea9d709e259')).toBe('6ab9a2cc-87f8-83eb-ae3f-8ea9d709e259');
+    expect(extractShareIdFromPath('/share/local%3Aabc')).toBe('local:abc');
+    expect(extractShareIdFromPath('/')).toBeUndefined();
+  });
+});
+
+describe('client-side thread ids', () => {
+  // Client-side branched threads ("local-chatgpt:" ids) are not stored on the
+  // backend: both conversation endpoints answer 400 "Invalid conversation" for
+  // them, so the API path must not be attempted and the DOM fallback should
+  // take over immediately.
+  it('detects client-side ids', () => {
+    expect(isClientSideConversationId('local-chatgpt:5ff271d7-ed2e-4122-952d-bc3771d498a4')).toBe(true);
+    expect(isClientSideConversationId('6ab9eb79-1f48-83ed-af3d-7f8315ce7ccc')).toBe(false);
+  });
+
+  it('fails fast for client-side ids without any network call', async () => {
+    const fetchImpl = jest.fn();
+    const result = await fetchConversationViaApi({
+      conversationId: 'local-chatgpt:5ff271d7-ed2e-4122-952d-bc3771d498a4',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/client-side/i);
   });
 });
 
