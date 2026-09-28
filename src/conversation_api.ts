@@ -50,12 +50,33 @@ export const isSharePath = (url: string): boolean => {
 
 export const extractConversationIdFromPath = (pathname: string): string | undefined => {
   const match = /^\/(?:g\/[^/]+\/)?c\/([^/?#]+)/.exec(pathname);
-  return match ? match[1] : undefined;
+  if (!match) return undefined;
+  // location.pathname keeps percent-encoding (e.g. local-chatgpt%3A<uuid> for
+  // client-side branched threads); decode once so the id is sent to the API
+  // exactly once-encoded as the server expects it.
+  try {
+    return decodeURIComponent(match[1]);
+  } catch (_error) {
+    return match[1];
+  }
 };
 
 export const extractShareIdFromPath = (pathname: string): string | undefined => {
   const match = /^\/share\/([^/?#]+)/.exec(pathname);
-  return match ? match[1] : undefined;
+  if (!match) return undefined;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch (_error) {
+    return match[1];
+  }
+};
+
+// Client-side branched threads get ids like "local-chatgpt:<uuid>"; they are
+// not stored server-side, so both conversation endpoints answer 400 "Invalid
+// conversation" for them. Skipping the API for these ids avoids two wasted
+// requests and routes straight to the DOM fallback.
+export const isClientSideConversationId = (conversationId: string): boolean => {
+  return conversationId.indexOf(':') !== -1;
 };
 
 const fetchJson = async (url: string, init: RequestInit | undefined, fetchImpl: typeof fetch): Promise<unknown> => {
@@ -88,6 +109,12 @@ export const fetchConversationViaApi = async ({
   conversationId: string;
   fetchImpl?: typeof fetch;
 }): Promise<ConversationApiResult> => {
+  if (isClientSideConversationId(conversationId)) {
+    return {
+      ok: false,
+      error: 'This is a client-side branched thread; the ChatGPT conversation API does not store it.',
+    };
+  }
   try {
     const accessToken = await fetchAccessToken(fetchImpl);
     const data = await fetchJson(

@@ -7,6 +7,24 @@ type PendingRequest = {
 const pendingRequests = new Map<number, PendingRequest>();
 export const chatGptExportTimeoutMs = 5 * 60 * 1000;
 
+// Test hook mirroring the action handler's pending-request setup so tests can
+// exercise the timeout feedback path without clicking the toolbar action.
+export const registerPendingExportForTest = (tabId: number): Promise<void> => {
+  return new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      pendingRequests.delete(tabId);
+      showFeedbackInTab(tabId, {
+        errorText: 'ChatGPT export timed out. Please try again; if this keeps happening on very long threads, wait for the thread to finish loading before exporting.',
+      }).catch(() => {
+        console.error('ChatGPT export timed out and the feedback toast could not be shown.');
+      });
+      reject(new Error('ChatGPT export timed out.'));
+    }, chatGptExportTimeoutMs);
+
+    pendingRequests.set(tabId, { resolve, reject, timeout });
+  });
+};
+
 type PageFeedbackResponse = {
   ok?: boolean;
   error?: string;
@@ -72,33 +90,50 @@ export const sendMarkdownToTab = async (tabId: number, markdownText: string): Pr
 chrome.runtime.onMessage.addListener(async (request, sender) => {
   if (!sender.tab || typeof sender.tab.id !== 'number') return;
 
-  const pendingRequest = pendingRequests.get(sender.tab.id);
-  if (!pendingRequest) return;
-
-  clearTimeout(pendingRequest.timeout);
-  pendingRequests.delete(sender.tab.id);
+  const tabId = sender.tab.id;
+  const pendingRequest = pendingRequests.get(tabId);
+  if (pendingRequest) {
+    clearTimeout(pendingRequest.timeout);
+    pendingRequests.delete(tabId);
+  }
 
   try {
     if (typeof request.markdownText === 'string') {
-      await sendMarkdownToTab(sender.tab.id, request.markdownText);
-      pendingRequest.resolve();
+      await sendMarkdownToTab(tabId, request.markdownText);
+      if (pendingRequest) pendingRequest.resolve();
       return;
     }
 
     if (typeof request.error === 'string') {
       await chrome.scripting.executeScript({
-        target: { tabId: sender.tab.id },
+        target: { tabId },
         files: ['js/page_feedback.bundle.js'],
         injectImmediately: true,
       });
-      await chrome.tabs.sendMessage(sender.tab.id, { errorText: request.error });
-      pendingRequest.reject(new Error(request.error));
+      await chrome.tabs.sendMessage(tabId, { errorText: request.error });
+      if (pendingRequest) pendingRequest.reject(new Error(request.error));
       return;
     }
 
-    pendingRequest.reject(new Error('The ChatGPT export script returned an unexpected response.'));
+    const unexpected = new Error('The ChatGPT export script returned an unexpected response.');
+    if (pendingRequest) {
+      pendingRequest.reject(unexpected);
+    } else {
+      // The result arrived after the service worker was recycled, so no request
+      // was waiting for it. Show what happened in the tab instead of dropping
+      // the message silently (this is what made long-thread exports look like
+      // "nothing happened").
+      await showFeedbackInTab(tabId, { errorText: unexpected.message });
+    }
   } catch (error) {
-    pendingRequest.reject(error instanceof Error ? error : new Error('Unable to complete the ChatGPT export flow.'));
+    const message = error instanceof Error ? error.message : 'Unable to complete the ChatGPT export flow.';
+    if (pendingRequest) {
+      pendingRequest.reject(error instanceof Error ? error : new Error(message));
+    } else {
+      // Same orphan case, but the feedback step itself failed (e.g. the tab
+      // navigated away). Nothing else can surface the error, so log it here.
+      console.error('ChatGPT Thread Exporter could not deliver its result:', message);
+    }
   }
 });
 
@@ -115,6 +150,14 @@ chrome.action.onClicked.addListener(async (tab) => {
     const completion = new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         pendingRequests.delete(tab.id as number);
+        // Surface the timeout in the exporting tab too: the click's async
+        // handler may itself be gone after a service worker recycle, and an
+        // unresolved promise shows the user nothing at all.
+        showFeedbackInTab(tab.id as number, {
+          errorText: 'ChatGPT export timed out. Please try again; if this keeps happening on very long threads, wait for the thread to finish loading before exporting.',
+        }).catch(() => {
+          console.error('ChatGPT export timed out and the feedback toast could not be shown.');
+        });
         reject(new Error('ChatGPT export timed out.'));
       }, chatGptExportTimeoutMs);
 

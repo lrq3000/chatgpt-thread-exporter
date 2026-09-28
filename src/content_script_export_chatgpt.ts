@@ -209,11 +209,21 @@ const fetchExportNodesFromNewShell = async (
   throw new Error('This page does not reference a ChatGPT conversation.');
 };
 
+// Capturing document.documentElement.outerHTML on very long threads means
+// stringifying tens of megabytes; make it lazy so it only happens when a
+// legacy fallback path actually needs the page HTML.
+let cachedPageHtml: string | undefined;
+const getPageHtml = (): string => {
+  if (cachedPageHtml === undefined) {
+    cachedPageHtml = document.documentElement ? document.documentElement.outerHTML : document.body.innerHTML;
+  }
+  return cachedPageHtml;
+};
+
 const runThreadExport = async (): Promise<void> => {
   try {
     const options = await loadExportOptions(chrome.storage.sync);
     const pathname = window.location.pathname;
-    const html = document.documentElement ? document.documentElement.outerHTML : document.body.innerHTML;
 
     let exportNodes: ExportNode[];
 
@@ -230,7 +240,7 @@ const runThreadExport = async (): Promise<void> => {
           // Fallback 2: legacy extraction paths (old UI DOM fibers, embedded
           // share payloads, runtime probes).
           exportNodes = getExportNodesFromSources({
-            html,
+            html: getPageHtml(),
             runtimeSnapshot: isLiveConversationPath(window.location.href)
               ? await injectFullThreadCollector(
                 document,
@@ -251,7 +261,7 @@ const runThreadExport = async (): Promise<void> => {
       }
     } else {
       exportNodes = getExportNodesFromSources({
-        html,
+        html: getPageHtml(),
         runtimeSnapshot: (() => {
           const pageWorldTurns = extractConversationTurnsFromDocument(document);
           return pageWorldTurns.length > 0
