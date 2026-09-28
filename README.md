@@ -11,9 +11,37 @@ It is designed specifically for ChatGPT pages as they are dynamically mounted si
 
 It includes user messages, assistant messages, sources and links (numbered and recapped at the end of each turn -- multiple sources for a single sentence are all extracted correctly), and optionally: tool or connector outputs, and reasoning or recap nodes.
 
-Both private and shared threads can be exported.
+Both private and shared threads can be exported, in both **Chat mode** and the new **Work mode** UI.
 
 To copy just a selection as markdown on any web page, see [copy-as-markdown](https://github.com/lrq3000/copy-as-markdown).
+
+### How extraction works
+
+OpenAI migrated chatgpt.com to a new app shell (the "Work mode" UI), which removed
+the old DOM markers and embedded conversation data the extension used to read.
+Since v0.1.7, the extension reads the conversation through ChatGPT's own backend
+API, using the access token of your currently logged-in session, with layered
+fallbacks so one broken path never blocks an export:
+
+1. **Conversation API (primary path).** The content script requests the session
+   token from `/api/auth/session`, then fetches the whole thread from
+   `/backend-api/conversation/{id}` (live threads) or `/backend-api/share/{id}`
+   (shared public threads). Both endpoints return the complete conversation in
+   the format the extension parses best, including citation metadata, tool
+   outputs and reasoning nodes. This path never depends on the page layout, so
+   it works the same on desktop and on narrow/mobile layouts, and it keeps
+   working after in-app navigation (no page reload needed).
+2. **New-shell DOM fallback.** If the API is unavailable (e.g. logged out), the
+   extension reads the rendered turns directly from the new UI markers
+   (`data-turn-key` turns, user bubbles and assistant markdown blocks).
+   Content is fully exported, but citations are not available this way because
+   the DOM does not carry the citation metadata.
+3. **Legacy paths.** The old extraction paths are kept for pages still served
+   with the previous UI or old share-page payloads.
+
+All requests are same-origin requests made inside the tab you are exporting:
+the extension requests no additional permissions and never reads anything
+outside the thread you asked for.
 
 ## Install
 
@@ -134,9 +162,12 @@ If you do not provide a key, `crx3` can generate one for local packaging, but th
 
 ## Notes
 
-- Shared ChatGPT pages are supported through embedded serialized conversation data.
-- Live logged-in ChatGPT pages are supported through runtime snapshot extraction paths.
-- If ChatGPT changes its internal client data structures substantially, this extension may need to be updated.
+- Shared ChatGPT pages (chat and work) are supported through the share API, with
+  the old embedded-payload parser kept as a fallback for legacy pages.
+- Live logged-in threads (chat and work) are supported through the conversation
+  API, with new-shell DOM and legacy runtime extraction as fallbacks.
+- If ChatGPT changes its internal client data structures substantially, this
+  extension may need to be updated.
 
 ## Known limitations
 
