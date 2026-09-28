@@ -11,6 +11,11 @@
     "build:crx": "crx3 -p -o -z -- dist/",
     "test": "jest --runInBand"
   },
+  "jest": {
+    "roots": [
+      "<rootDir>/src"
+    ]
+  },
   "keywords": [
     "Chrome",
     "Extension",
