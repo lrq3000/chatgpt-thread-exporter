@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Thread Exporter",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Copy full ChatGPT threads as Markdown.",
   "homepage_url": "https://github.com/lrq3000/chatgpt-thread-exporter",
   "icons": {
@@ -10,7 +10,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage", "scripting", "activeTab", "clipboardWrite"],
+  "permissions": ["storage", "scripting", "activeTab", "clipboardWrite", "downloads"],
   "background": {
     "service_worker": "js/background_script.bundle.js"
   },

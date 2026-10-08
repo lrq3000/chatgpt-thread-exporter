@@ -276,7 +276,14 @@ const runThreadExport = async (): Promise<void> => {
     if (!markdownText) {
       throw new Error('The current ChatGPT thread did not produce any exportable Markdown.');
     }
-    await chrome.runtime.sendMessage({ markdownText });
+    // Default delivery is a file picked by the user: huge threads are
+    // unreliable through the clipboard. The tab title (the thread title)
+    // pre-fills the Save As dialog's suggested filename.
+    await chrome.runtime.sendMessage({
+      markdownText,
+      saveAsFile: options.saveToFile !== false,
+      suggestedName: document.title,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown ChatGPT export error.';
     await chrome.runtime.sendMessage({ error: message });
