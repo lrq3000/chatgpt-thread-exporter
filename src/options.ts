@@ -14,11 +14,15 @@ type StorageArea = typeof chrome.storage.sync;
 export const initializeOptionsPage = async (doc: DocumentLike, storageArea: StorageArea): Promise<void> => {
   const toolCheckbox = doc.getElementById('include-tool-outputs');
   const reasoningCheckbox = doc.getElementById('include-reasoning-nodes');
+  const saveFileCheckbox = doc.getElementById('save-to-file');
   if (!toolCheckbox || !reasoningCheckbox) return;
 
   const options = await loadExportOptions(storageArea);
   toolCheckbox.checked = options.includeToolOutputs;
   reasoningCheckbox.checked = options.includeReasoningNodes;
+  if (saveFileCheckbox) {
+    saveFileCheckbox.checked = options.saveToFile;
+  }
 
   toolCheckbox.addEventListener('change', () => {
     void saveExportOptions({ includeToolOutputs: toolCheckbox.checked }, storageArea);
@@ -26,6 +30,11 @@ export const initializeOptionsPage = async (doc: DocumentLike, storageArea: Stor
   reasoningCheckbox.addEventListener('change', () => {
     void saveExportOptions({ includeReasoningNodes: reasoningCheckbox.checked }, storageArea);
   });
+  if (saveFileCheckbox) {
+    saveFileCheckbox.addEventListener('change', () => {
+      void saveExportOptions({ saveToFile: saveFileCheckbox.checked }, storageArea);
+    });
+  }
 };
 
 if (typeof document !== 'undefined' && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {

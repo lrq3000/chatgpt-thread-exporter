@@ -1,6 +1,7 @@
 export type ExportOptions = {
   includeToolOutputs: boolean;
   includeReasoningNodes: boolean;
+  saveToFile: boolean;
 };
 
 type RawConversationMessage = {

@@ -15,6 +15,9 @@ const getRuntimeError = (): Error | undefined => {
 export const defaultExportOptions: ExportOptions = {
   includeToolOutputs: true,
   includeReasoningNodes: true,
+  // Multi-megabyte exports are unreliable through the clipboard, so the file
+  // picker is the default delivery path; users can switch back to clipboard.
+  saveToFile: true,
 };
 
 export const loadExportOptions = (storageArea: StorageArea): Promise<ExportOptions> => {
@@ -29,6 +32,7 @@ export const loadExportOptions = (storageArea: StorageArea): Promise<ExportOptio
       resolve({
         includeToolOutputs: items.includeToolOutputs !== false,
         includeReasoningNodes: items.includeReasoningNodes !== false,
+        saveToFile: items.saveToFile !== false,
       });
     });
   });

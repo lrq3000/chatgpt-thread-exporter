@@ -65,7 +65,7 @@ You can also package it as a CRX or zip for local distribution. See the CRX subs
 1. Open a ChatGPT thread on `https://chatgpt.com/`.
 2. Either scroll all the way up to force load all messages, or create a shareable link and open it (all messages are loaded at once in a shareable link).
 3. Click the **ChatGPT Thread Exporter** toolbar icon.
-4. The extension extracts the whole thread and copies the resulting Markdown to the clipboard.
+4. A native **Save As** dialog opens, pre-filled with the thread title: pick the location and filename, and the export is written directly to that Markdown file.
 5. A toast appears in the page to confirm success or to show an error.
 
 ### What gets exported by default
@@ -94,12 +94,13 @@ Main assistant response
 
 ### Options
 
-The extension exposes an options page with two toggles:
+The extension exposes an options page with three toggles:
 
+- **Save the export to a Markdown file (file picker) instead of copying to the clipboard** (enabled by default): exports are written to a file you pick in Chrome's native Save As dialog, pre-filled with the thread title. This is the recommended mode: very long threads produce multi-megabyte Markdown that the clipboard handles unreliably.
 - **Include tool and connector outputs**
 - **Include reasoning and recap nodes**
 
-Both are enabled by default.
+All three are enabled by default.
 
 To open the options page:
 

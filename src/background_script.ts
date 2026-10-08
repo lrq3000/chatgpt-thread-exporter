@@ -87,6 +87,93 @@ export const sendMarkdownToTab = async (tabId: number, markdownText: string): Pr
   }
 };
 
+// Builds a filesystem-safe suggested name out of the thread title shown in the
+// tab. The Save As dialog lets the user adjust it, but a sensible default
+// (matching the conversation title) is what gets pre-filled.
+export const buildSuggestedFileName = (suggestedName: string | undefined): string => {
+  const fallback = 'chatgpt-thread.md';
+  if (!suggestedName) return fallback;
+
+  const cleaned = suggestedName
+    // Strip every character Windows/POSIX filesystems reject, plus the
+    // characters Chrome itself disallows in download filenames.
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return fallback;
+
+  // Keep the suggested name reasonably short so the dialog stays usable.
+  const trimmed = cleaned.length > 170 ? cleaned.slice(0, 170).trim() : cleaned;
+  return trimmed + '.md';
+};
+
+// Huge threads produce multi-megabyte markdown that the clipboard handles
+// unreliably, so the default delivery writes a file through Chrome's native
+// Save As dialog (the user picks the location and can rename the file).
+export const saveMarkdownToFile = async (
+  tabId: number,
+  markdownText: string,
+  suggestedName: string | undefined
+): Promise<void> => {
+  const downloadsApi = (chrome as unknown as { downloads?: { download: (options: unknown, callback: (downloadId?: number) => void) => void } }).downloads;
+  if (!downloadsApi || typeof downloadsApi.download !== 'function') {
+    // No downloads API (unexpected on supported Chrome versions): degrade to
+    // the clipboard path so the export still reaches the user.
+    await sendMarkdownToTab(tabId, markdownText);
+    return;
+  }
+
+  // Service workers have no URL.createObjectURL, so the payload travels as a
+  // data URL. Base64 avoids any percent-encoding size blow-up for non-ASCII.
+  const bytes = new TextEncoder().encode(markdownText);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const dataUrl = 'data:text/markdown;charset=utf-8;base64,' + btoa(binary);
+  const filename = buildSuggestedFileName(suggestedName);
+
+  await new Promise<void>((resolve) => {
+    downloadsApi.download(
+      {
+        url: dataUrl,
+        filename,
+        saveAs: true,
+      },
+      (downloadId) => {
+        void (async () => {
+          try {
+            if (typeof downloadId !== 'number') {
+              // A falsy id means the user dismissed the Save As dialog
+              // (runtime.lastError carries "Download canceled by the user").
+              await showFeedbackInTab(tabId, { errorText: 'File save canceled.' });
+            } else {
+              await showFeedbackInTab(tabId, { successText: 'ChatGPT thread saved as Markdown file' });
+            }
+          } finally {
+            resolve();
+          }
+        })();
+      }
+    );
+  });
+};
+
+// Central delivery: file save when the export asked for it (option enabled in
+// the content script), clipboard copy otherwise.
+export const deliverMarkdownResult = async (
+  tabId: number,
+  markdownText: string,
+  saveAsFile: boolean,
+  suggestedName?: string
+): Promise<void> => {
+  if (saveAsFile) {
+    await saveMarkdownToFile(tabId, markdownText, suggestedName);
+    return;
+  }
+  await sendMarkdownToTab(tabId, markdownText);
+};
+
 chrome.runtime.onMessage.addListener(async (request, sender) => {
   if (!sender.tab || typeof sender.tab.id !== 'number') return;
 
@@ -99,7 +186,12 @@ chrome.runtime.onMessage.addListener(async (request, sender) => {
 
   try {
     if (typeof request.markdownText === 'string') {
-      await sendMarkdownToTab(tabId, request.markdownText);
+      await deliverMarkdownResult(
+        tabId,
+        request.markdownText,
+        request.saveAsFile === true,
+        typeof request.suggestedName === 'string' ? request.suggestedName : undefined
+      );
       if (pendingRequest) pendingRequest.resolve();
       return;
     }

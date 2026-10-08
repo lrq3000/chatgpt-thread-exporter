@@ -145,3 +145,149 @@ describe('orphaned export results stay visible to the user', () => {
     jest.useRealTimers();
   });
 });
+
+describe('saving exports to a markdown file', () => {
+  // Huge threads produce multi-megabyte markdown; the clipboard is unreliable
+  // at that size. The default delivery path writes the export to a file the
+  // user picks through Chrome's native Save As dialog (downloads API).
+  const executeScript = jest.fn();
+  const sendMessage = jest.fn();
+  const download = jest.fn();
+
+  const buildChrome = () => ({
+    runtime: {
+      onMessage: { addListener: jest.fn() },
+    },
+    action: { onClicked: { addListener: jest.fn() } },
+    scripting: { executeScript },
+    tabs: { sendMessage },
+    downloads: { download },
+  });
+
+  beforeEach(() => {
+    jest.resetModules();
+    executeScript.mockReset();
+    sendMessage.mockReset();
+    download.mockReset();
+    (global as unknown as { chrome: unknown }).chrome = buildChrome();
+  });
+
+  afterEach(() => {
+    delete (global as unknown as { chrome?: unknown }).chrome;
+  });
+
+  it('downloads the markdown with a native Save As dialog', async () => {
+    const { saveMarkdownToFile } = require('./background_script');
+    // chrome.downloads.download reports results via its callback.
+    download.mockImplementation((_options: unknown, callback: (downloadId?: number) => void) => {
+      callback(42);
+    });
+    sendMessage.mockResolvedValue(undefined);
+    executeScript.mockResolvedValue(undefined);
+
+    await expect(saveMarkdownToFile(123, '# Hello', 'My thread title')).resolves.toBeUndefined();
+
+    expect(download).toHaveBeenCalledTimes(1);
+    const options = download.mock.calls[0][0];
+    expect(options.saveAs).toBe(true);
+    expect(options.filename).toBe('My thread title.md');
+    expect(options.url).toMatch(/^data:text\/markdown;charset=utf-8;base64,/);
+    // The user gets an explicit confirmation toast in the exporting tab.
+    expect(sendMessage).toHaveBeenCalledWith(123, { successText: expect.stringContaining('saved') });
+  });
+
+  it('sanitizes unsafe characters out of the suggested filename', async () => {
+    const { buildSuggestedFileName } = require('./background_script');
+
+    expect(buildSuggestedFileName('Branche · Branche · KEEP: Vocal q\\vies "super" <insights>?')).toBe('Branche · Branche · KEEP Vocal q vies super insights.md');
+    expect(buildSuggestedFileName('   ')).toBe('chatgpt-thread.md');
+    expect(buildSuggestedFileName('A'.repeat(300)).length).toBeLessThanOrEqual(180);
+  });
+
+  it('does not fail silently when the user cancels the Save As dialog', async () => {
+    const { saveMarkdownToFile } = require('./background_script');
+    // chrome.downloads.download reports cancellation through a falsy download
+    // id in its callback (with runtime.lastError set).
+    download.mockImplementation((_options: unknown, callback: (downloadId?: number) => void) => {
+      callback(undefined);
+    });
+    (global as unknown as { chrome: unknown }).chrome = {
+      ...buildChrome(),
+      runtime: {
+        onMessage: { addListener: jest.fn() },
+        lastError: { message: 'Download canceled by the user' },
+      },
+    };
+    sendMessage.mockResolvedValue(undefined);
+    executeScript.mockResolvedValue(undefined);
+
+    await expect(saveMarkdownToFile(123, '# Hello', 'Thread')).resolves.toBeUndefined();
+
+    expect(sendMessage).toHaveBeenCalledWith(123, { errorText: expect.stringMatching(/cancel/i) });
+  });
+
+  it('falls back to clipboard copy when the downloads API is unavailable', async () => {
+    const { saveMarkdownToFile } = require('./background_script');
+    (global as unknown as { chrome: unknown }).chrome = {
+      runtime: { onMessage: { addListener: jest.fn() } },
+      action: { onClicked: { addListener: jest.fn() } },
+      scripting: { executeScript },
+      tabs: { sendMessage },
+      // no `downloads` at all: older runtime, API disabled, etc.
+    };
+    executeScript.mockResolvedValue(undefined);
+    sendMessage.mockResolvedValue({ ok: true });
+
+    await expect(saveMarkdownToFile(123, '# Hello', 'Thread')).resolves.toBeUndefined();
+
+    expect(sendMessage).toHaveBeenCalledWith(123, { markdownText: '# Hello', silent: true });
+    expect(sendMessage).toHaveBeenCalledWith(123, { successText: expect.stringContaining('copied') });
+  });
+
+  it('routes save-as-file results through the message listener', async () => {
+    const onMessageListeners: Array<(request: any, sender: any) => unknown> = [];
+    (global as unknown as { chrome: unknown }).chrome = {
+      runtime: { onMessage: { addListener: (listener: (request: any, sender: any) => unknown) => { onMessageListeners.push(listener); } } },
+      action: { onClicked: { addListener: jest.fn() } },
+      scripting: { executeScript },
+      tabs: { sendMessage },
+      downloads: { download },
+    };
+    download.mockImplementation((_options: unknown, callback: (downloadId?: number) => void) => {
+      callback(7);
+    });
+    sendMessage.mockResolvedValue(undefined);
+    executeScript.mockResolvedValue(undefined);
+    require('./background_script');
+    const listener = onMessageListeners[0];
+
+    await listener(
+      { markdownText: '# Hello', saveAsFile: true, suggestedName: 'My thread' },
+      { tab: { id: 321 } }
+    );
+
+    const options = download.mock.calls[0][0];
+    expect(options.saveAs).toBe(true);
+    expect(options.filename).toBe('My thread.md');
+  });
+
+  it('keeps clipboard delivery when saveAsFile is not requested', async () => {
+    const onMessageListeners: Array<(request: any, sender: any) => unknown> = [];
+    (global as unknown as { chrome: unknown }).chrome = {
+      runtime: { onMessage: { addListener: (listener: (request: any, sender: any) => unknown) => { onMessageListeners.push(listener); } } },
+      action: { onClicked: { addListener: jest.fn() } },
+      scripting: { executeScript },
+      tabs: { sendMessage },
+      downloads: { download },
+    };
+    sendMessage.mockResolvedValue({ ok: true });
+    executeScript.mockResolvedValue(undefined);
+    require('./background_script');
+    const listener = onMessageListeners[0];
+
+    await listener({ markdownText: '# Hello' }, { tab: { id: 321 } });
+
+    expect(download).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith(321, { markdownText: '# Hello', silent: true });
+  });
+});
